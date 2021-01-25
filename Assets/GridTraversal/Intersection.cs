@@ -1,7 +1,6 @@
 using Unity.Collections;
 using Unity.Mathematics;
 
-// Todo: Create a capsule for checking (for more precision)
 public static class GridIntersection
 {
     public static void Circle(Circle circle, NativeList<uint2> nodes)

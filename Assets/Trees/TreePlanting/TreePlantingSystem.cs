@@ -1,12 +1,12 @@
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-[GenerateAuthoringComponent]
 public class TreePlantingSystem : SystemBase
 {
     private EndSimulationEntityCommandBufferSystem endSimulationEntityCommandBuffer;
-
+    private int plantedTrees;
     protected override void OnCreate()
     {
         endSimulationEntityCommandBuffer = World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>();
@@ -15,27 +15,60 @@ public class TreePlantingSystem : SystemBase
 
     protected override void OnUpdate()
     {
-        EntityCommandBuffer.ParallelWriter ecb = endSimulationEntityCommandBuffer.CreateCommandBuffer().AsParallelWriter();
+        EntityCommandBuffer ecb = endSimulationEntityCommandBuffer.CreateCommandBuffer();
         Random random = new Random();
         random.InitState();
 
-        Entities.ForEach((Entity entity, int entityInQueryIndex, in TreePlantingData planting) =>
-        {
-            UnityEngine.Debug.Log($"Planting {TreePlantingInformation.TreeCount} trees");
-            for (int i = 0; i < TreePlantingInformation.TreeCount; i++)
-            {
-                float3 p = RandomPositionInBoundaries(TreePlantingInformation.TerrainBoundaries, ref random);
-                PlantTree(ecb, entityInQueryIndex, p, planting.treeModel);
-            }
+        Environment env = Program.Env;
 
-            ecb.DestroyEntity(entityInQueryIndex, entity);
-        }).ScheduleParallel(Dependency).Complete();
+        TreeModel treeModel = FetchTreePrefab();
+
+        if (plantedTrees == Program.Env.treeCount)
+        {
+            return;
+        }
+        
+        UnityEngine.Debug.Log($"Planting {env.treeCount} trees");
+
+        Entities.WithAll<TreeTag>().ForEach((Entity e) =>
+        {
+            ecb.DestroyEntity(e);
+        }).Run();
+
+        
+        for (int i = 0; i < env.treeCount; i++)
+        {
+            float3 p = RandomPositionInBoundaries(Environment.TerrainBoundaries, ref random);
+            PlantTree(ecb, p, treeModel.model);
+        }
+
+        plantedTrees = Program.Env.treeCount;
+
+
     }
 
-    private static void PlantTree(EntityCommandBuffer.ParallelWriter ecb, int sortKey, float3 position, Entity model)
+    /// <summary>
+    /// Assumes that there is only one model
+    /// </summary>
+    /// <returns></returns>
+    private TreeModel FetchTreePrefab()
     {
-        Entity instantiated = ecb.Instantiate(sortKey, model);
-        ecb.SetComponent(sortKey, instantiated, new Translation
+        NativeArray<TreeModel> trees = new NativeArray<TreeModel>(1, Allocator.Temp);
+        Entities.ForEach((Entity entity, int entityInQueryIndex, in TreeModel model) =>
+        {
+            // ReSharper disable once AccessToDisposedClosure
+            trees[entityInQueryIndex] = model;
+        }).Run();
+        
+        TreeModel t = trees[0];
+        trees.Dispose();
+        return t;
+    }
+
+    private static void PlantTree(EntityCommandBuffer ecb, float3 position, Entity model)
+    {
+        Entity instantiated = ecb.Instantiate(model);
+        ecb.SetComponent(instantiated, new Translation
         {
             Value = position
         });
