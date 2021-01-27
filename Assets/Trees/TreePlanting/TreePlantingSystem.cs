@@ -2,6 +2,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine.Profiling;
 
 public class TreePlantingSystem : SystemBase
 {
@@ -29,7 +30,7 @@ public class TreePlantingSystem : SystemBase
         }
         
         UnityEngine.Debug.Log($"Planting {env.treeCount} trees");
-
+        Profiler.BeginSample("Planting trees");
         Entities.WithAll<TreeTag>().ForEach((Entity e) =>
         {
             ecb.DestroyEntity(e);
@@ -43,8 +44,7 @@ public class TreePlantingSystem : SystemBase
         }
 
         plantedTrees = Program.Env.treeCount;
-
-
+        Profiler.EndSample();
     }
 
     /// <summary>

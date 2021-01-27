@@ -7,12 +7,17 @@ public class Options : MonoBehaviour
 {
     [SerializeField] private Toggle cacheHashTable;
     [SerializeField] private TMP_Dropdown bezierUpdateMode;
+    [SerializeField] private TMP_Dropdown hashmapMode;
+
     [SerializeField] private ProSlider trees;
     [SerializeField] private ProSlider gridSize;
     [SerializeField] private ProSlider bezierSegments;
     [SerializeField] private ProSlider riverRoadWidth;
 
+    private RoadTreeRemovalSystemUnity roadTreeRemovalSystemUnity;
     private RoadTreeRemovalSystem roadTreeRemovalSystem;
+    private RoadTreeRemovalSystemPozzer roadTreeRemovalSystemPozzer;
+
     private BezierEditor editor;
 
     private void Start()
@@ -26,6 +31,8 @@ public class Options : MonoBehaviour
 
     private void CacheReferences()
     {
+        roadTreeRemovalSystemUnity = World.DefaultGameObjectInjectionWorld.GetExistingSystem<RoadTreeRemovalSystemUnity>();
+        roadTreeRemovalSystemPozzer = World.DefaultGameObjectInjectionWorld.GetExistingSystem<RoadTreeRemovalSystemPozzer>();
         roadTreeRemovalSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystem<RoadTreeRemovalSystem>();
         editor = FindObjectOfType<BezierEditor>();
     }
@@ -34,15 +41,39 @@ public class Options : MonoBehaviour
     {
         cacheHashTable.onValueChanged.AddListener(OnCacheHashTableToggleChange);
         bezierUpdateMode.onValueChanged.AddListener(OnBezierUpdateModeChange);
+        hashmapMode.onValueChanged.AddListener(OnHashmapModeChange);
         trees.onValueChanged.AddListener(OnTreesCountChange);
         gridSize.onValueChanged.AddListener(OnGridSizeChange);
         bezierSegments.onValueChanged.AddListener(OnBezierSegmentsChange);
         riverRoadWidth.onValueChanged.AddListener(OnRiverRoadWidthChange);
     }
 
+    private void OnHashmapModeChange(int arg)
+    {
+        switch (arg)
+        {
+            case 0:
+                roadTreeRemovalSystemUnity.Active = true;
+                roadTreeRemovalSystemPozzer.Active = false;
+                roadTreeRemovalSystem.Active = false;
+                break;
+            case 1:
+                roadTreeRemovalSystemUnity.Active = false;
+                roadTreeRemovalSystemPozzer.Active = true;
+                roadTreeRemovalSystem.Active = false;
+                break;
+            default:
+                roadTreeRemovalSystemUnity.Active = false;
+                roadTreeRemovalSystemPozzer.Active = false;
+                roadTreeRemovalSystem.Active = true;
+                break;
+        }
+    }
+
     private void OnCacheHashTableToggleChange(bool arg0)
     {
-        roadTreeRemovalSystem.CacheHashTable = !roadTreeRemovalSystem.CacheHashTable;
+        roadTreeRemovalSystemUnity.CacheHashTable = !roadTreeRemovalSystemUnity.CacheHashTable;
+        roadTreeRemovalSystemPozzer.CacheHashTable = !roadTreeRemovalSystemPozzer.CacheHashTable;
     }
     
     private void OnBezierUpdateModeChange(int arg0)

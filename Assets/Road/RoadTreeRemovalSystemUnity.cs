@@ -1,7 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using NUnit;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -11,14 +9,13 @@ using Unity.Transforms;
 using Debug = UnityEngine.Debug;
 
 // ReSharper disable ForCanBeConvertedToForeach - Native Collections do not implement IEnumerable
-
 // ReSharper disable AccessToDisposedClosure - Disposes only happens after job is completed but Rider fails to see that
-
-public class RoadTreeRemovalSystem : SystemBase
+public class RoadTreeRemovalSystemUnity : SystemBase
 {
     private EntityQuery roadQuery;
-
     public bool CacheHashTable { get; set; } = true;
+
+    public bool Active { get; set; } = true;
 
     private bool hashTableCreated;
 
@@ -33,14 +30,12 @@ public class RoadTreeRemovalSystem : SystemBase
     {
         roadQuery = GetEntityQuery(ComponentType.ReadOnly<RoadSegment>());
         entityCommandBuffer = World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>();
-        // hashTable = new NativeArray<TreeHashNode>(TreePlantingInformation.TreeCount, Allocator.Persistent);
-        Debug.Log("");
         hashTable = new NativeMultiHashMap<uint2, TreeHashNode>(Program.Env.treeCount, Allocator.Persistent);
     }
 
     protected override void OnUpdate()
     {
-        if (roadQuery.IsEmpty)
+        if (roadQuery.IsEmpty || !Active)
         {
             return;
         }
@@ -92,30 +87,30 @@ public class RoadTreeRemovalSystem : SystemBase
         NativeMultiHashMap<uint2, TreeHashNode> hashTable = this.hashTable;
         
         Entities.ForEach((Entity entity, int entityInQueryIndex, in RoadSegment roadSegment) => 
+        {
+            NativeList<uint2> nodes = new NativeList<uint2>(Allocator.Temp);
+
+            float3 mid = (roadSegment.initial + roadSegment.final) / 2;
+            float length = math.distance(roadSegment.initial, roadSegment.final) / 2;
+
+            float2 center = (mid.xz - Environment.TerrainBoundaries.Min.xz) /
+                            env.gridSize;
+            float radius = (length + env.roadWidth) / env.gridSize;
+
+            Circle influenceZone = new Circle(center, radius);
+
+            GridIntersection.Circle(influenceZone, nodes);
+
+            for (int i = 0; i < nodes.Length; i++)
             {
-                NativeList<uint2> nodes = new NativeList<uint2>(Allocator.Temp);
+                RemoveTreeFromSegment(hashTable, nodes[i], roadSegment, ecb, sortKey, env);
+            }
 
-                float3 mid = (roadSegment.initial + roadSegment.final) / 2;
-                float length = math.distance(roadSegment.initial, roadSegment.final) / 2;
-
-                float2 center = (mid.xz - Environment.TerrainBoundaries.Min.xz) /
-                                env.gridSize;
-                float radius = (length + env.roadWidth) / env.gridSize;
-
-                Circle influenceZone = new Circle(center, radius);
-
-                GridIntersection.Circle(influenceZone, nodes);
-
-                for (int i = 0; i < nodes.Length; i++)
-                {
-                    RemoveTreeFromSegment(hashTable, nodes[i], roadSegment, ecb, sortKey, env);
-                }
-
-                ecb.DestroyEntity(entityInQueryIndex, entity);
-                nodes.Dispose();
-            })
-            .WithReadOnly(hashTable)
-            .ScheduleParallel(Dependency).Complete();
+            ecb.DestroyEntity(entityInQueryIndex, entity);
+            nodes.Dispose();
+        })
+        .WithReadOnly(hashTable)
+        .ScheduleParallel(Dependency).Complete();
     }
     
     private void GenerateHashTable(float inverseGridSize)

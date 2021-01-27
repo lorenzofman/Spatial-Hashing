@@ -16,5 +16,6 @@ public class InterfaceLogger : MonoBehaviour
             Log instance = Instantiate(logPrefab, logManager.content);
             instance.logText.text = msg;
         }
+        logManager.normalizedPosition = new Vector2(0, 0);
     }
 }
