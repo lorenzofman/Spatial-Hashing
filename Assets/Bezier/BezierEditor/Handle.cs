@@ -6,6 +6,7 @@ public class Handle : MonoBehaviour
 {
     private Camera cam;
     private Action updateBezier;
+    public BezierUpdateMode updateMode;
 
     private void Start()
     {
@@ -16,6 +17,10 @@ public class Handle : MonoBehaviour
     {
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
         transform.position = LineIntersectXZPlane(ray);
+        if (updateMode == BezierUpdateMode.OnDrag)
+        {
+            updateBezier.Invoke();
+        }
     }
 
     private void OnMouseUp()
